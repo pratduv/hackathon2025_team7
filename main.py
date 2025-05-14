@@ -1,17 +1,17 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 from openai import OpenAI
 from fastapi_mcp import FastApiMCP
 import uvicorn
-from typing import List, Dict, Any, Optional
+from typing import List, Dict
 import json
 
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="OpenAI MCP API")
+app = FastAPI(title="OpenAI MCP Server")
 
 # Initialize OpenAI client
 
@@ -45,6 +45,14 @@ async def process_prompt(request: PromptRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# In-memory storage for regulations
+stored_regulations: List[Dict[str, str]] = []
+
+# Models
+class Regulation(BaseModel):
+    id: str
+    description: str
+
 class RegulationViolation(BaseModel):
     start_line: int
     end_line: int
@@ -58,26 +66,25 @@ class CheckRegulationsResponse(BaseModel):
     violations: List[RegulationViolation]
     total_violations: int
 
-@app.post(
-    "/check-regulations",
-    response_model=CheckRegulationsResponse,
-    summary="Upload code and check it against a set of regulations",
-)
-async def check_regulations(
-    file: UploadFile = File(...),
-    regulations: str = Form(...),
-) -> CheckRegulationsResponse:
+@app.post("/set-regulations", summary="Set the active list of regulations")
+async def set_regulations(regulations: List[Regulation]):
+    global stored_regulations
+    stored_regulations = [reg.dict() for reg in regulations]
+    return {"status": "success", "total_regulations": len(stored_regulations)}
+
+@app.post("/check-violations", response_model=CheckRegulationsResponse)
+async def check_violations(file: UploadFile = File(...)) -> CheckRegulationsResponse:
+    if not stored_regulations:
+        raise HTTPException(status_code=400, detail="No regulations are currently set.")
+
     try:
-        # Read & split the file
         content = await file.read()
         file_content = content.decode("utf-8")
         file_lines = file_content.splitlines()
-        
-        # Parse the JSON string of regulations
-        regulations_list: List[Dict[str, str]] = json.loads(regulations)
-        
+
         violations: List[Dict] = []
-        for regulation in regulations_list:
+
+        for regulation in stored_regulations:
             reg_id = regulation.get("id", "unknown")
             reg_description = regulation.get("description", "No description")
             
@@ -93,7 +100,7 @@ async def check_regulations(
                 '"description": str, "severity": "low"|"medium"|"high" } '
                 '] }\n'
                 "If there are no violations, return: { \"violations\": [] }"
-                "Be specific with the lines of code that are violating the regulation - dont just give wide ranges"
+                "Be specific with the lines of code that are violating the regulation - don't just give wide ranges."
             )
             
             response = client.chat.completions.create(
@@ -134,7 +141,7 @@ async def check_regulations(
 # Add the MCP server to your FastAPI app
 mcp = FastApiMCP(
     app,
-    name="OpenAI MCP API",
+    name="OpenAI MCP Demo",
     description="MCP server for OpenAI API integration",
     # base_url="http://localhost:8000"
 )
@@ -143,4 +150,4 @@ mcp = FastApiMCP(
 mcp.mount()
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(app, host="0.0.0.0", port=8000)
