@@ -281,7 +281,7 @@ if uploaded_file and st.button("🚨 Run Check", type="primary"):
                                 f"> {v['description']}"
                             )
                             snippet_text = get_code_snippet_text(file_lines, v['start_line'], v['end_line'])
-                            st.code(snippet_text, language="python", line_numbers=True)
+                            st.code(snippet_text, language="python", line_numbers=False)
                             st.caption(f"Violation in snippet above corresponds to original file lines: {v['start_line']}-{v['end_line']}")
                 else:
                     st.success("No regulatory violations found! ✅")
@@ -317,7 +317,7 @@ if uploaded_file and st.button("🚨 Run Check", type="primary"):
                                 f"> {v.get('description', 'No description')}"
                             )
                             snippet_text = get_code_snippet_text(file_lines, v.get('start_line', 0), v.get('end_line', 0))
-                            st.code(snippet_text, language="python", line_numbers=True)
+                            st.code(snippet_text, language="python", line_numbers=False)
                             st.caption(f"Violation in snippet above corresponds to original file lines: {v.get('start_line', 0)}-{v.get('end_line', 0)}")
                 else:
                     st.success("No code rule violations found! ✅")
