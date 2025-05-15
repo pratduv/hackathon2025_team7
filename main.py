@@ -133,13 +133,14 @@ async def delete_code_rules(code_rule_id: str):
     stored_code_rules = [rule for rule in stored_code_rules if rule["id"] != code_rule_id]
     return {"status": "success", "deleted_code_rule_id": code_rule_id}
 
-@app.post("/check-violations", response_model=CheckRegulationsResponse)
-async def check_violations(
+
+@app.post("/review-code-rules", response_model=CheckCodeResponse)
+async def review_code_rules(    
     file: Optional[UploadFile] = File(None),
-    file_str: Optional[str] = None,
-) -> CheckRegulationsResponse:
-    if not stored_regulations:
-        raise HTTPException(status_code=400, detail="No regulations are currently set.")
+    file_str: Optional[str] = None
+    ) -> CheckCodeResponse:
+    if not stored_code_rules:
+        raise HTTPException(status_code=400, detail="No code rules are currently set.")
 
     try:
         if file is not None:
@@ -154,14 +155,15 @@ async def check_violations(
         file_lines = file_content.splitlines()
 
         violations: List[Dict] = []
-
-        for regulation in stored_regulations:
-            reg_id = regulation.get("id", "unknown")
-            reg_description = regulation.get("description", "No description")
+        i = 0
+        for code_rule in stored_code_rules:
+            i+=1
+            rule_id = code_rule.get("id", "unknown")
+            rule_description = code_rule.get("description", "No description")
             
             prompt = (
-                f"Analyze the following code for violations of regulation {reg_id!r}:\n"
-                f"{reg_description}\n\n"
+                f"Analyze the following code for violations of code rule {rule_id!r}:\n"
+                f"{rule_description}\n\n"
                 "```python\n"
                 f"{file_content}\n"
                 "```\n\n"
@@ -171,7 +173,7 @@ async def check_violations(
                 '"description": str, "severity": "low"|"medium"|"high" } '
                 '] }\n'
                 "If there are no violations, return: { \"violations\": [] }"
-                "Be specific with the lines of code that are violating the regulation - don't just give wide ranges."
+                "Be specific with the lines of code that are violating the code rule - don't just give wide ranges."
             )
             
             response = client.chat.completions.create(
@@ -182,27 +184,29 @@ async def check_violations(
             )
             
             try:
-                result = parse_json_response(response.choices[0].message.content)
-                reg_violations = result.get("violations", [])
+                result = json.loads(response.choices[0].message.content)
+                rule_violations = result.get("violations", [])
             except json.JSONDecodeError:
                 # fallback if the LLM returns non‑JSON
-                reg_violations = [{
+                rule_violations = [{
                     "start_line": 1,
                     "end_line": len(file_lines),
                     "description": "Error parsing model output; manual review required.",
                     "severity": "medium",
                 }]
             
-            # annotate with regulation_id
-            for v in reg_violations:
-                v["regulation_id"] = reg_id
-            violations.extend(reg_violations)
+            # annotate with code_rule_id
+            for v in rule_violations:
+                v["code_rule_id"] = rule_id
+            violations.extend(rule_violations)
+            if i > 2:
+                break
         
         # Build the Pydantic response
-        return CheckRegulationsResponse(
+        return CheckCodeResponse(
             filename=filename,
             total_lines=len(file_lines),
-            violations=[RegulationViolation(**v) for v in violations],
+            violations=[CodeViolation(**v) for v in violations],
             total_violations=len(violations),
         )
     
