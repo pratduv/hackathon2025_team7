@@ -85,6 +85,16 @@ class CheckCodeResponse(BaseModel):
     violations: List[CodeViolation]
     total_violations: int
 
+def parse_json_response(response: str) -> Dict:
+    response = response.strip()
+    if response.startswith("```json"):
+        response = response[7:]  # Remove the leading ```json
+    if response.startswith("```"):
+        response = response[3:]  # Remove the leading ```
+    if response.endswith("```"):
+        response = response[:-3]  # Remove the trailing ```
+    return json.loads(response.strip())
+
 @app.post("/add-regulations", summary="Add regulations")
 async def add_regulations(regulations: List[Regulation]):
     global stored_regulations
@@ -172,7 +182,7 @@ async def check_violations(
             )
             
             try:
-                result = json.loads(response.choices[0].message.content)
+                result = parse_json_response(response.choices[0].message.content)
                 reg_violations = result.get("violations", [])
             except json.JSONDecodeError:
                 # fallback if the LLM returns non‑JSON
@@ -239,7 +249,7 @@ async def check_code_violations(file: UploadFile = File(...)) -> CheckCodeRespon
             )
             
             try:
-                result = json.loads(response.choices[0].message.content)
+                result = parse_json_response(response.choices[0].message.content)
                 rule_violations = result.get("violations", [])
             except json.JSONDecodeError:
                 # fallback if the LLM returns non‑JSON
@@ -368,7 +378,7 @@ async def check_cost(
         )
         
         try:
-            result = json.loads(response.choices[0].message.content)
+            result = parse_json_response(response.choices[0].message.content)
             
             llm_calls = result.get("llm_calls", [])
         except json.JSONDecodeError:
