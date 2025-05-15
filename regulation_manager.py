@@ -202,32 +202,119 @@ with st.expander("⚙️ Manage Code Rules", expanded=True):
 # 🧪 Violation Checker Section
 # ============================
 st.markdown("---")
-st.header("🧪 Check Violations in Uploaded Code")
+st.header("🧪 Check Code for Legal Violations and Code Rules")
 
 uploaded_file = st.file_uploader("Upload a Python file to check:", type=["py"])
 
-if uploaded_file and st.button("🚨 Run Check"):
+check_col1, check_col2 = st.columns(2)
+
+check_regulations = check_col1.checkbox("Check Regulatory Violations", value=True)
+check_code_rules = check_col2.checkbox("Check Code Violations", value=True)
+
+if uploaded_file and st.button("🚨 Run Check", type="primary"):
+    # Track total violations for summary
+    total_violations = 0
+    
+    # Check Regulatory Violations
+    if check_regulations:
+        try:
+            with st.spinner("Analyzing regulatory violations..."):
+                files = {"file": uploaded_file}
+                r = requests.post(f"{API_BASE}/check-violations", files=files)
+
+            if r.ok:
+                result = r.json()
+                total_violations += result['total_violations']
+                
+                if result['total_violations'] > 0:
+                    with st.expander(f"📋 Regulatory Violations ({result['total_violations']})", expanded=True):
+                        for v in result["violations"]:
+                            severity_color = {
+                                "low": "🟢",
+                                "medium": "🟠",
+                                "high": "🔴"
+                            }.get(v["severity"], "⚪")
+                            st.markdown(
+                                f"{severity_color} **[{v['regulation_id']}]** "
+                                f"Lines `{v['start_line']}-{v['end_line']}`\n\n"
+                                f"> {v['description']}"
+                            )
+                else:
+                    st.success("No regulatory violations found! ✅")
+            else:
+                st.error(f"❌ Regulation check failed: {r.status_code}: {r.text}")
+        except Exception as e:
+            st.error(f"❌ Failed to check regulatory violations: {e}")
+
+    # Check Code Rule Violations
+    if check_code_rules:
+        try:
+            with st.spinner("Analyzing code rule violations..."):
+                # Reset the file position for reuse
+                uploaded_file.seek(0)
+                files = {"file": uploaded_file}
+                r = requests.post(f"{API_BASE}/check-code-violations", files=files)
+
+            if r.ok:
+                result = r.json()
+                total_violations += result.get('total_violations', 0)
+                
+                if result.get('total_violations', 0) > 0:
+                    with st.expander(f"🔍 Code Rule Violations ({result.get('total_violations', 0)})", expanded=True):
+                        for v in result.get("violations", []):
+                            severity_color = {
+                                "low": "🟢",
+                                "medium": "🟠",
+                                "high": "🔴"
+                            }.get(v.get("severity", "medium"), "⚪")
+                            st.markdown(
+                                f"{severity_color} **[{v.get('code_rule_id', 'UNKNOWN')}]** "
+                                f"Lines `{v.get('start_line', 0)}-{v.get('end_line', 0)}`\n\n"
+                                f"> {v.get('description', 'No description')}"
+                            )
+                else:
+                    st.success("No code rule violations found! ✅")
+            else:
+                st.error(f"❌ Code rule check failed: {r.status_code}: {r.text}")
+        except Exception as e:
+            st.error(f"❌ Failed to check code rule violations: {e}")
+    
+    # Check for LLM Cost Analysis
     try:
-        with st.spinner("Analyzing..."):
+        with st.spinner("Analyzing LLM cost..."):
+            # Reset the file position for reuse
+            uploaded_file.seek(0)
             files = {"file": uploaded_file}
-            r = requests.post(f"{API_BASE}/check-violations", files=files)
+            r = requests.post(f"{API_BASE}/check-cost", files=files)
 
         if r.ok:
             result = r.json()
-            st.success(f"✅ `{result['filename']}` analyzed. Found {result['total_violations']} violation(s).")
-
-            for v in result["violations"]:
-                severity_color = {
-                    "low": "🟢",
-                    "medium": "🟠",
-                    "high": "🔴"
-                }.get(v["severity"], "⚪")
-                st.markdown(
-                    f"{severity_color} **[{v['regulation_id']}]** "
-                    f"Lines `{v['start_line']}-{v['end_line']}`\n\n"
-                    f"> {v['description']}"
-                )
+            total_calls = result.get('total_calls', 0)
+            
+            if total_calls > 0:
+                # Format the cost with 6 decimal places
+                total_cost = "${:,.6f}".format(result.get('total_estimated_cost', 0))
+                
+                with st.expander(f"💰 LLM Cost Analysis - {total_cost} for {total_calls} calls", expanded=True):
+                    for call in result.get("llm_calls", []):
+                        call_cost = "${:,.6f}".format(call.get('estimated_cost', 0))
+                        st.markdown(
+                            f"**Model: {call.get('model', 'unknown')}** ({call.get('call_type', 'unknown')}) - {call_cost}\n\n"
+                            f"Lines `{call.get('start_line', 0)}-{call.get('end_line', 0)}`\n\n"
+                            f"• Input tokens: {call.get('estimated_input_tokens', 0):,}\n"
+                            f"• Output tokens: {call.get('estimated_output_tokens', 0):,}\n\n"
+                            f"> {call.get('description', 'No description')}"
+                        )
+                        st.markdown("---")
+            else:
+                st.info("No LLM API calls detected in this code.")
         else:
-            st.error(f"❌ {r.status_code}: {r.text}")
+            st.warning(f"⚠️ Cost analysis not available: {r.status_code}")
     except Exception as e:
-        st.error(f"❌ Failed to check violations: {e}")
+        st.warning(f"⚠️ Cost analysis failed: {e}")
+    
+    # Show final summary
+    if total_violations > 0:
+        st.warning(f"⚠️ Total violations found: {total_violations}")
+    elif check_regulations or check_code_rules:
+        st.success("✅ No violations found in the code!")
