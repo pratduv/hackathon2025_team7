@@ -1,0 +1,12 @@
+[theme]
+# Primary brand color
+primaryColor="#644DF9"
+
+# Light gray background for the main content area
+backgroundColor="#FFFFFF"
+
+# White background for elements like cards, expanders, sidebar
+secondaryBackgroundColor="#F9F9FB"
+
+# Dark text color for good contrast
+textColor="#1c1b22"

@@ -1,10 +1,76 @@
 import streamlit as st
 import requests
+import base64
 
-API_BASE = "http://localhost:8000"
+API_BASE = "http://localhost:8009"
 
-st.set_page_config(page_title="MCP Regulation Manager", layout="wide")
-st.title("📜 MCP Regulation Manager + Violation Checker")
+st.set_page_config(
+    page_title="Galileo Indemnity",
+    page_icon="logo.svg",
+    layout="wide"
+)
+
+# Apply custom Inter font
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+html, body, [class*="st-"], [data-testid="stSidebar"] {
+    font-family: 'Inter', sans-serif !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# load and base64-encode your SVG
+svg = base64.b64encode(open("logo.svg", "rb").read()).decode()
+
+st.sidebar.markdown(
+    f"""
+    <div style="text-align: center; width: 100%;">
+      <img src="data:image/svg+xml;base64,{svg}" width="120" style="display: inline-block;" />
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+    <style>
+    .container {
+        display: flex;
+    }
+    .logo-text {
+        font-weight:600 !important;
+        font-size:44px !important;
+        color: #644DF9 !important;
+        margin-top: -20px !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    f"""
+    <div class="container">
+        <p class="logo-text">Galileo Indemnity</p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    """
+    <style>
+      /* targets all st.info / warning / error boxes */
+      div[role="alert"] {
+        background-color: #E9E7FF !important;
+        border-left: 4px solid #644DF9 !important;
+        border: #644DF9 !important;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # --- Cache Helpers ---
 @st.cache_data(ttl=5)
