@@ -66,10 +66,23 @@ class RegulationViolation(BaseModel):
     description: str
     severity: str = "medium"
 
+class CodeViolation(BaseModel):
+    start_line: int
+    end_line: int
+    code_rule_id: str
+    description: str
+    severity: str = "medium"
+
 class CheckRegulationsResponse(BaseModel):
     filename: str
     total_lines: int
     violations: List[RegulationViolation]
+    total_violations: int
+
+class CheckCodeResponse(BaseModel):
+    filename: str
+    total_lines: int
+    violations: List[CodeViolation]
     total_violations: int
 
 @app.post("/add-regulations", summary="Add regulations")
@@ -176,6 +189,72 @@ async def check_violations(file: UploadFile = File(...)) -> CheckRegulationsResp
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.post("/check-code-violations", response_model=CheckCodeResponse)
+async def check_code_violations(file: UploadFile = File(...)) -> CheckCodeResponse:
+    if not stored_code_rules:
+        raise HTTPException(status_code=400, detail="No code rules are currently set.")
+
+    try:
+        content = await file.read()
+        file_content = content.decode("utf-8")
+        file_lines = file_content.splitlines()
+
+        violations: List[Dict] = []
+
+        for code_rule in stored_code_rules:
+            rule_id = code_rule.get("id", "unknown")
+            rule_description = code_rule.get("description", "No description")
+            
+            prompt = (
+                f"Analyze the following code for violations of code rule {rule_id!r}:\n"
+                f"{rule_description}\n\n"
+                "```python\n"
+                f"{file_content}\n"
+                "```\n\n"
+                "Return ONLY valid JSON in the form:\n"
+                '{ "violations": [ '
+                '{ "start_line": int, "end_line": int, '
+                '"description": str, "severity": "low"|"medium"|"high" } '
+                '] }\n'
+                "If there are no violations, return: { \"violations\": [] }"
+                "Be specific with the lines of code that are violating the code rule - don't just give wide ranges."
+            )
+            
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=2000,
+            )
+            
+            try:
+                result = json.loads(response.choices[0].message.content)
+                rule_violations = result.get("violations", [])
+            except json.JSONDecodeError:
+                # fallback if the LLM returns non‑JSON
+                rule_violations = [{
+                    "start_line": 1,
+                    "end_line": len(file_lines),
+                    "description": "Error parsing model output; manual review required.",
+                    "severity": "medium",
+                }]
+            
+            # annotate with code_rule_id
+            for v in rule_violations:
+                v["code_rule_id"] = rule_id
+            violations.extend(rule_violations)
+        
+        # Build the Pydantic response
+        return CheckCodeResponse(
+            filename=file.filename,
+            total_lines=len(file_lines),
+            violations=[CodeViolation(**v) for v in violations],
+            total_violations=len(violations),
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class LLMCostEstimate(BaseModel):
