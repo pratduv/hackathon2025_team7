@@ -16,6 +16,15 @@ def fetch_regulations():
         st.error(f"Failed to fetch regulations: {e}")
         return []
 
+@st.cache_data(ttl=5)
+def fetch_code_rules():
+    try:
+        r = requests.get(f"{API_BASE}/get-code-rules", timeout=5)
+        return r.json() if r.ok else []
+    except Exception as e:
+        st.error(f"Failed to fetch code rules: {e}")
+        return []
+
 def add_regulation(regulation):
     try:
         r = requests.post(f"{API_BASE}/add-regulations", json=[regulation])
@@ -27,11 +36,33 @@ def add_regulation(regulation):
     except Exception as e:
         st.error(f"❌ Failed to add regulation: {e}")
 
+def add_code_rule(code_rule):
+    try:
+        r = requests.post(f"{API_BASE}/add-code-rules", json=[code_rule])
+        if r.ok:
+            st.success(f"✅ Added: {code_rule['id']}")
+            st.cache_data.clear()
+        else:
+            st.error(f"❌ {r.status_code}: {r.text}")
+    except Exception as e:
+        st.error(f"❌ Failed to add code rule: {e}")
+
 def delete_regulation(reg_id):
     try:
         r = requests.delete(f"{API_BASE}/delete-regulations", params={"regulation_id": reg_id})
         if r.ok:
             st.success(f"🗑️ Deleted: {reg_id}")
+            st.cache_data.clear()
+        else:
+            st.error(f"❌ {r.status_code}: {r.text}")
+    except Exception as e:
+        st.error(f"❌ Failed to delete: {e}")
+        
+def delete_code_rule(rule_id):
+    try:
+        r = requests.delete(f"{API_BASE}/delete-code-rules", params={"code_rule_id": rule_id})
+        if r.ok:
+            st.success(f"🗑️ Deleted: {rule_id}")
             st.cache_data.clear()
         else:
             st.error(f"❌ {r.status_code}: {r.text}")
@@ -67,6 +98,38 @@ with st.expander("⚙️ Manage Regulations", expanded=True):
             col2.markdown(reg["description"])
             if col3.button("🗑️", key=f"del_{reg['id']}"):
                 delete_regulation(reg["id"])
+                st.experimental_rerun()
+
+# ============================
+# 📝 Code Rules Manager Section
+# ============================
+st.markdown("---")
+with st.expander("⚙️ Manage Code Rules", expanded=True):
+    # --- Add Code Rule Form ---
+    with st.form("rule_form", clear_on_submit=True):
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            rule_id = st.text_input("Code Rule ID", placeholder="e.g., PERF-1")
+        with col2:
+            rule_description = st.text_area("Description", placeholder="What should this code rule enforce?")
+        if st.form_submit_button("Add"):
+            if rule_id.strip() and rule_description.strip():
+                add_code_rule({"id": rule_id.strip(), "description": rule_description.strip()})
+            else:
+                st.warning("Please provide both ID and description.")
+
+    # --- Display Code Rules ---
+    code_rules = fetch_code_rules()
+    st.subheader("📄 Current Code Rules")
+    if not code_rules:
+        st.info("No code rules currently defined.")
+    else:
+        for rule in code_rules:
+            col1, col2, col3 = st.columns([1.5, 6, 1])
+            col1.markdown(f"**{rule['id']}**")
+            col2.markdown(rule["description"])
+            if col3.button("🗑️", key=f"del_rule_{rule['id']}"):
+                delete_code_rule(rule["id"])
                 st.experimental_rerun()
 
 # ============================

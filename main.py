@@ -47,9 +47,15 @@ async def process_prompt(request: PromptRequest):
 
 # In-memory storage for regulations
 stored_regulations: List[Dict[str, str]] = []
+# In-memory storage for code rules
+stored_code_rules: List[Dict[str, str]] = []
 
 # Models
 class Regulation(BaseModel):
+    id: str
+    description: str
+
+class CodeRule(BaseModel):
     id: str
     description: str
 
@@ -75,15 +81,34 @@ async def add_regulations(regulations: List[Regulation]):
         stored_regulations.append(regulation.dict())
     return {"status": "success", "added_regulations": regulations}
 
+@app.post("/add-code-rules", summary="Add code rules")
+async def add_code_rules(code_rules: List[CodeRule]):
+    global stored_code_rules
+    for rule in code_rules:
+        if rule.id in [r["id"] for r in stored_code_rules]:
+            raise HTTPException(status_code=400, detail=f"Code Rule ID {rule.id} already exists.")
+        stored_code_rules.append(rule.dict())
+    return {"status": "success", "added_code_rules": code_rules}
+
 @app.get("/get-regulations", summary="Get the active list of regulations")
 async def get_regulations():
     return stored_regulations
+
+@app.get("/get-code-rules", summary="Get the active list of code rules")
+async def get_code_rules():
+    return stored_code_rules
 
 @app.delete("/delete-regulations", summary="Delete regulations")
 async def delete_regulations(regulation_id: str):
     global stored_regulations
     stored_regulations = [reg for reg in stored_regulations if reg["id"] != regulation_id]
     return {"status": "success", "deleted_regulation_id": regulation_id}
+
+@app.delete("/delete-code-rules", summary="Delete code rules")
+async def delete_code_rules(code_rule_id: str):
+    global stored_code_rules
+    stored_code_rules = [rule for rule in stored_code_rules if rule["id"] != code_rule_id]
+    return {"status": "success", "deleted_code_rule_id": code_rule_id}
 
 @app.post("/check-violations", response_model=CheckRegulationsResponse)
 async def check_violations(file: UploadFile = File(...)) -> CheckRegulationsResponse:
