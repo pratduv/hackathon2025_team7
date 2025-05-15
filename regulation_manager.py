@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 
-API_BASE = "http://localhost:8009"
+API_BASE = "http://localhost:8000"
 
 st.set_page_config(
     page_title="Galileo Indemnity",
