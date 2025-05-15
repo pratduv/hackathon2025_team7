@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 
-API_BASE = "http://localhost:8000"
+API_BASE = "http://localhost:8009"
 
 st.set_page_config(
     page_title="Galileo Indemnity",
@@ -16,6 +16,56 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 html, body, [class*="st-"], [data-testid="stSidebar"] {
     font-family: 'Inter', sans-serif !important;
+}
+.container {
+    display: flex;
+}
+.logo-text {
+    font-weight:600 !important;
+    font-size:44px !important;
+    color: #644DF9 !important;
+    margin-top: -20px !important;
+}
+/* targets all st.info / warning / error boxes */
+div[role="alert"] {
+    background-color: #E9E7FF !important;
+    border-left: 4px solid #644DF9 !important;
+    border: 1px solid #644DF9 !important; /* Corrected from 'border: #644DF9 !important;' */
+}
+/* For the form containers */
+div[data-testid="stExpander"] div[data-testid="stForm"] {
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+/* For each item card in the lists (rows created by st.columns after a subheader) */
+div[data-testid="stExpander"] div[data-testid="stHorizontalBlock"]:not(div[data-testid="stForm"] div[data-testid="stHorizontalBlock"]) {
+    background-color: #ffffff;
+    border: 1px solid #e7e7e7;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+}
+
+/* Adjust font size for expander labels */
+div[data-testid="stExpander"] summary {
+    font-size: 1.3em !important;
+    font-weight: 600 !important;
+}
+
+/* Adjust font size for subheaders within expanders */
+div[data-testid="stExpander"] h3 {
+    font-size: 1.05em !important;
+    font-weight: 500 !important;
+    margin-top: 20px !important;
+    margin-bottom: 15px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -32,22 +82,6 @@ st.sidebar.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown(
-    """
-    <style>
-    .container {
-        display: flex;
-    }
-    .logo-text {
-        font-weight:600 !important;
-        font-size:44px !important;
-        color: #644DF9 !important;
-        margin-top: -20px !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 st.markdown(
     f"""
@@ -58,19 +92,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.markdown(
-    """
-    <style>
-      /* targets all st.info / warning / error boxes */
-      div[role="alert"] {
-        background-color: #E9E7FF !important;
-        border-left: 4px solid #644DF9 !important;
-        border: #644DF9 !important;
-      }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
 # --- Cache Helpers ---
 @st.cache_data(ttl=5)
@@ -154,7 +175,7 @@ with st.expander("⚙️ Manage Regulations", expanded=True):
 
     # --- Display Regulations ---
     regulations = fetch_regulations()
-    st.subheader("📄 Current Regulations")
+    st.subheader("📋 Current Regulations")
     if not regulations:
         st.info("No regulations currently defined.")
     else:
@@ -186,7 +207,7 @@ with st.expander("⚙️ Manage Code Rules", expanded=True):
 
     # --- Display Code Rules ---
     code_rules = fetch_code_rules()
-    st.subheader("📄 Current Code Rules")
+    st.subheader("📋 Current Code Rules")
     if not code_rules:
         st.info("No code rules currently defined.")
     else:
