@@ -55,9 +55,9 @@ div[data-testid="stExpander"] div[data-testid="stHorizontalBlock"]:not(div[data-
 }
 
 /* Adjust font size for expander labels */
-div[data-testid="stExpander"] summary {
-    font-size: 1.3em !important;
-    font-weight: 600 !important;
+div[data-testid="stExpander"] summary div[data-testid="stMarkdownContainer"] p {
+    font-size: 1.05em !important;
+    font-weight: 400 !important;
 }
 
 /* Adjust font size for subheaders within expanders */
