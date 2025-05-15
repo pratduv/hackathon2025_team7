@@ -5,7 +5,7 @@ import os
 from openai import OpenAI
 from fastapi_mcp import FastApiMCP
 import uvicorn
-from typing import List, Dict
+from typing import List, Dict, Optional
 import json
 
 # Load environment variables
@@ -124,13 +124,23 @@ async def delete_code_rules(code_rule_id: str):
     return {"status": "success", "deleted_code_rule_id": code_rule_id}
 
 @app.post("/check-violations", response_model=CheckRegulationsResponse)
-async def check_violations(file: UploadFile = File(...)) -> CheckRegulationsResponse:
+async def check_violations(
+    file: Optional[UploadFile] = File(None),
+    file_str: Optional[str] = None,
+) -> CheckRegulationsResponse:
     if not stored_regulations:
         raise HTTPException(status_code=400, detail="No regulations are currently set.")
 
     try:
-        content = await file.read()
-        file_content = content.decode("utf-8")
+        if file is not None:
+            content = await file.read()
+            file_content = content.decode("utf-8")
+            filename = file.filename
+        elif file_str is not None:
+            file_content = file_str
+            filename = "string_input.py"
+        else:
+            raise HTTPException(status_code=400, detail="No file or file_str provided.")
         file_lines = file_content.splitlines()
 
         violations: List[Dict] = []
@@ -180,7 +190,7 @@ async def check_violations(file: UploadFile = File(...)) -> CheckRegulationsResp
         
         # Build the Pydantic response
         return CheckRegulationsResponse(
-            filename=file.filename,
+            filename=filename,
             total_lines=len(file_lines),
             violations=[RegulationViolation(**v) for v in violations],
             total_violations=len(violations),
