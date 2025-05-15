@@ -23,7 +23,7 @@ def test_cost_estimation():
     # Make the request
     print(f"Sending request to {url}...")
     response = requests.post(url, files=files)
-    import pdb; pdb.set_trace()
+    
     # Check if the request was successful
     if response.status_code == 200:
         result = response.json()
@@ -56,7 +56,7 @@ def test_cost_estimation():
         
         return True
     else:
-        import pdb; pdb.set_trace()
+        
         print(f"Error: {response.status_code}")
         print(response.text)
         return False

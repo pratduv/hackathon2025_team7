@@ -170,7 +170,7 @@ async def check_cost(
         content = await file.read()
         file_content = content.decode("utf-8")
         file_lines = file_content.splitlines()
-        import pdb; pdb.set_trace()
+        
         
         # Model pricing information (USD per 1000 tokens)
         model_pricing = {
@@ -232,7 +232,7 @@ async def check_cost(
             "}\n"
             "If no LLM API calls are found, return: {\"llm_calls\": []}"
         )
-        import pdb; pdb.set_trace()
+        
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
@@ -242,10 +242,10 @@ async def check_cost(
         
         try:
             result = json.loads(response.choices[0].message.content)
-            import pdb; pdb.set_trace()
+            
             llm_calls = result.get("llm_calls", [])
         except json.JSONDecodeError:
-            import pdb; pdb.set_trace()
+            
             # Fallback if the LLM returns non-JSON
             llm_calls = [{
                 "start_line": 1,
@@ -286,7 +286,7 @@ async def check_cost(
         )
     
     except Exception as e:
-        import pdb; pdb.set_trace()
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 
