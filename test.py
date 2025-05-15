@@ -1,13 +1,12 @@
 import time
 import requests
 from pathlib import Path
-
 import uvicorn
 from multiprocessing import Process
 
 # ---- Launch app ----
 def run_server():
-    from main import app  # Replace with your actual app path
+    from main import app  # Adjust if your app file has a different name
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
 
 def wait_for_server(url, timeout=10):
@@ -32,7 +31,16 @@ def main():
 
     print("[SERVER] Started.")
 
-    # --- Set Regulations ---
+    # --- Clean up any existing regulations ---
+    try:
+        existing = requests.get("http://127.0.0.1:8000/get-regulations").json()
+        for reg in existing:
+            requests.delete("http://127.0.0.1:8000/delete-regulations", params={"regulation_id": reg["id"]})
+        print("[CLEANUP] Existing regulations deleted.")
+    except Exception as e:
+        print(f"[CLEANUP ERROR] {e}")
+
+    # --- Add Regulations ---
     regulations = [
         {
             "id": "GDPR-5",
@@ -48,9 +56,9 @@ def main():
         }
     ]
 
-    r = requests.post("http://127.0.0.1:8000/set-regulations", json=regulations)
-    assert r.ok, f"Failed to set regulations: {r.status_code} - {r.text}"
-    print("[SET REGULATIONS] Success")
+    r = requests.post("http://127.0.0.1:8000/add-regulations", json=regulations)
+    assert r.ok, f"Failed to add regulations: {r.status_code} - {r.text}"
+    print("[ADD REGULATIONS] Success")
 
     # --- Check Violations ---
     test_file = Path(__file__).parent / "sample_bad.py"

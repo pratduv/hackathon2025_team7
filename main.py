@@ -66,11 +66,24 @@ class CheckRegulationsResponse(BaseModel):
     violations: List[RegulationViolation]
     total_violations: int
 
-@app.post("/set-regulations", summary="Set the active list of regulations")
-async def set_regulations(regulations: List[Regulation]):
+@app.post("/add-regulations", summary="Add regulations")
+async def add_regulations(regulations: List[Regulation]):
     global stored_regulations
-    stored_regulations = [reg.dict() for reg in regulations]
-    return {"status": "success", "total_regulations": len(stored_regulations)}
+    for regulation in regulations:
+        if regulation.id in [reg["id"] for reg in stored_regulations]:
+            raise HTTPException(status_code=400, detail=f"Regulation ID {regulation.id} already exists.")
+        stored_regulations.append(regulation.dict())
+    return {"status": "success", "added_regulations": regulations}
+
+@app.get("/get-regulations", summary="Get the active list of regulations")
+async def get_regulations():
+    return stored_regulations
+
+@app.delete("/delete-regulations", summary="Delete regulations")
+async def delete_regulations(regulation_id: str):
+    global stored_regulations
+    stored_regulations = [reg for reg in stored_regulations if reg["id"] != regulation_id]
+    return {"status": "success", "deleted_regulation_id": regulation_id}
 
 @app.post("/check-violations", response_model=CheckRegulationsResponse)
 async def check_violations(file: UploadFile = File(...)) -> CheckRegulationsResponse:
