@@ -1,49 +1,76 @@
-import json
+import time
 import requests
+from pathlib import Path
 
-# 1. Endpoint URL
-url = "http://localhost:8000/check-regulations"
+import uvicorn
+from multiprocessing import Process
 
-# 2. Prepare the file to upload
-import os
+# ---- Launch app ----
+def run_server():
+    from main import app  # Replace with your actual app path
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="error")
 
-# Get the current script's directory and use a relative path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(current_dir, "sample_bad.py")
-files = {
-    "file": open(file_path, "rb")
-}
+def wait_for_server(url, timeout=10):
+    for _ in range(timeout * 10):
+        try:
+            requests.get(url)
+            return True
+        except requests.exceptions.ConnectionError:
+            time.sleep(0.1)
+    return False
 
-# 3. Define your regulations as a JSON array
-regulations = [
-    {
-        "id": "GDPR-5",
-        "description": "Ensure  no personal data (e.g., names, emails, IPs) is logged or stored without masking"
-    },
-    {
-        "id": "SOC2-CC6.1",
-        "description": "All external API calls must use TLS/HTTPS"
-    },
-    {
-        "id": "GDPR-17",
-        "description": "Support right-to-be-forgotten: code must allow deletion of user data upon request"
-    }
-]
+def main():
+    # Start FastAPI server in a background process
+    server = Process(target=run_server, daemon=True)
+    server.start()
 
-data = {
-    # Must be a string — the server will `json.loads` it
-    "regulations": json.dumps(regulations)
-}
+    # Wait for it to be up
+    if not wait_for_server("http://127.0.0.1:8000/docs"):
+        print("Server failed to start.")
+        server.terminate()
+        return
 
-# 4. POST the request
-response = requests.post(url, files=files, data=data)
+    print("[SERVER] Started.")
 
-# 5. Check and print the result
-if response.ok:
-    result = response.json()
-    print(f"Checked `{result['filename']}` ({result['total_lines']} lines), "
-          f"found {result['total_violations']} violation(s):")
-    for v in result["violations"]:
-        print(f" - [{v['regulation_id']}] lines {v['start_line']}-{v['end_line']}: {v['description']} ({v['severity']})")
-else:
-    print(f"Error {response.status_code}: {response.text}")
+    # --- Set Regulations ---
+    regulations = [
+        {
+            "id": "GDPR-5",
+            "description": "Ensure no personal data (e.g., names, emails, IPs) is logged or stored without masking"
+        },
+        {
+            "id": "SOC2-CC6.1",
+            "description": "All external API calls must use TLS/HTTPS"
+        },
+        {
+            "id": "GDPR-17",
+            "description": "Support right-to-be-forgotten: code must allow deletion of user data upon request"
+        }
+    ]
+
+    r = requests.post("http://127.0.0.1:8000/set-regulations", json=regulations)
+    assert r.ok, f"Failed to set regulations: {r.status_code} - {r.text}"
+    print("[SET REGULATIONS] Success")
+
+    # --- Check Violations ---
+    test_file = Path(__file__).parent / "sample_bad.py"
+    with open(test_file, "rb") as f:
+        files = {"file": f}
+        r = requests.post("http://127.0.0.1:8000/check-violations", files=files)
+
+    if r.ok:
+        result = r.json()
+        print(f"\nChecked `{result['filename']}` ({result['total_lines']} lines), "
+              f"found {result['total_violations']} violation(s):")
+        for v in result["violations"]:
+            print(f" - [{v['regulation_id']}] lines {v['start_line']}-{v['end_line']}: {v['description']} ({v['severity']})")
+    else:
+        print(f"[CHECK VIOLATIONS] Error {r.status_code}: {r.text}")
+
+    # --- Shutdown ---
+    print("[SERVER] Shutting down...")
+    server.terminate()
+    server.join()
+
+if __name__ == "__main__":
+    main()
