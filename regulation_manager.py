@@ -93,6 +93,20 @@ st.markdown(
 )
 
 
+def get_code_snippet_text(all_lines, viol_start_line, viol_end_line, context=1):
+    # Convert to 0-based indexing for list access
+    start_idx = viol_start_line - 1
+    end_idx = viol_end_line - 1
+
+    snippet_start_idx = max(0, start_idx - context)
+    snippet_end_idx = min(len(all_lines) - 1, end_idx + context)
+
+    if snippet_start_idx > snippet_end_idx : # Check for invalid range or empty snippet
+            return "Could not display code snippet (invalid range or empty file)."
+
+    snippet_lines = all_lines[snippet_start_idx : snippet_end_idx + 1]
+    return '\n'.join(snippet_lines)
+
 # --- Cache Helpers ---
 @st.cache_data(ttl=5)
 def fetch_regulations():
@@ -185,7 +199,7 @@ with st.expander("⚙️ Manage Regulations", expanded=True):
             col2.markdown(reg["description"])
             if col3.button("🗑️", key=f"del_{reg['id']}"):
                 delete_regulation(reg["id"])
-                st.experimental_rerun()
+                st.rerun()
 
 # ============================
 # 📝 Code Rules Manager Section
@@ -217,7 +231,7 @@ with st.expander("⚙️ Manage Code Rules", expanded=True):
             col2.markdown(rule["description"])
             if col3.button("🗑️", key=f"del_rule_{rule['id']}"):
                 delete_code_rule(rule["id"])
-                st.experimental_rerun()
+                st.rerun()
 
 # ============================
 # 🧪 Violation Checker Section
@@ -233,6 +247,12 @@ check_regulations = check_col1.checkbox("Check Regulatory Violations", value=Tru
 check_code_rules = check_col2.checkbox("Check Code Violations", value=True)
 
 if uploaded_file and st.button("🚨 Run Check", type="primary"):
+    # Read file content once
+    uploaded_file.seek(0) # Ensure we start from the beginning
+    file_content_str = uploaded_file.getvalue().decode("utf-8")
+    file_lines = file_content_str.splitlines()
+    uploaded_file.seek(0) # Reset for any other part of the script that might read it
+
     # Track total violations for summary
     total_violations = 0
     
@@ -260,6 +280,9 @@ if uploaded_file and st.button("🚨 Run Check", type="primary"):
                                 f"Lines `{v['start_line']}-{v['end_line']}`\n\n"
                                 f"> {v['description']}"
                             )
+                            snippet_text = get_code_snippet_text(file_lines, v['start_line'], v['end_line'])
+                            st.code(snippet_text, language="python", line_numbers=True)
+                            st.caption(f"Violation in snippet above corresponds to original file lines: {v['start_line']}-{v['end_line']}")
                 else:
                     st.success("No regulatory violations found! ✅")
             else:
@@ -293,6 +316,9 @@ if uploaded_file and st.button("🚨 Run Check", type="primary"):
                                 f"Lines `{v.get('start_line', 0)}-{v.get('end_line', 0)}`\n\n"
                                 f"> {v.get('description', 'No description')}"
                             )
+                            snippet_text = get_code_snippet_text(file_lines, v.get('start_line', 0), v.get('end_line', 0))
+                            st.code(snippet_text, language="python", line_numbers=True)
+                            st.caption(f"Violation in snippet above corresponds to original file lines: {v.get('start_line', 0)}-{v.get('end_line', 0)}")
                 else:
                     st.success("No code rule violations found! ✅")
             else:
